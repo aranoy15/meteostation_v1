@@ -2,14 +2,17 @@
 use cortex_m_rt::{exception};
 use cortex_m::{peripheral::{SYST, syst}, interrupt::Mutex};
 use core::cell::Cell;
+use crate::system::config::SYSTEM_CLOCK;
 
 pub type TickType = u32;
+
+const RELOAD_VALUE: u32 = SYSTEM_CLOCK / 1000;
 
 static COUNTER: Mutex<Cell<TickType>> = Mutex::new(Cell::new(0));
 
 pub fn init(mut syst: SYST) {
     syst.set_clock_source(syst::SystClkSource::Core);
-    syst.set_reload(72_000_u32);
+    syst.set_reload(RELOAD_VALUE);
     syst.clear_current();
     syst.enable_counter();
     syst.enable_interrupt();
