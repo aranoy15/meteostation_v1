@@ -1,0 +1,41 @@
+[package]
+name = "app"
+version = "0.1.0"
+authors = ["afedoseev <afedoseev@AFEDOSEEV>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cortex-m = "0.7"
+cortex-m-rt = "0.6"
+panic-halt = "0.2"
+embedded-hal = "0.2"
+nb = "1.0"
+usb-device = "0.2.4"
+usbd-serial = "0.1"
+usbd-webusb = "1.0.0"
+heapless = "0.6"
+
+[dependencies.stm32f1xx-hal]
+version = "0.7"
+features = ["rt", "stm32f103", "medium", "stm32-usbd"]
+
+[profile.dev.package."*"]
+codegen-units = 1
+debug = true
+opt-level = "s"
+
+[[bin]]
+name = "app"
+test = false
+bench = false
+
+[profile.dev]
+debug = true
+opt-level = 1
+
+[profile.release]
+lto = true
+debug = true
+opt-level = "s"
