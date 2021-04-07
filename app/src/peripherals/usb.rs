@@ -21,13 +21,26 @@ static mut USB_DEVICE: Option<UsbDevice<'static, usb::UsbBusType>> = None;
 
 static INTPUT_BUFFER: Q64<u8> = Q64::new();
 
+pub struct UsbLog {}
+
+impl core::fmt::Write for UsbLog {
+    fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {
+        match crate::peripherals::usb::write(s.as_bytes()) { _ => {} }
+        Ok(())
+    }
+
+    fn write_char(&mut self, c: char) -> Result<(), core::fmt::Error> {
+        match crate::peripherals::usb::write(&mut [c as u8]) { _ => {} }
+        Ok(())
+    }
+}
+
 #[macro_export]
 macro_rules! usb_write {
     ($($arg:tt)*) => {
        {
-           let mut temp_log: app::peripherals::usb::DefaultString = app::peripherals::usb::DefaultString::new();
+           let mut temp_log = app::peripherals::usb::UsbLog {};
            match core::writeln!(&mut temp_log, $($arg)*) { _ => {} }
-           match app::peripherals::usb::write(temp_log.as_bytes()) { _ => {} }
        } 
     };
 }
