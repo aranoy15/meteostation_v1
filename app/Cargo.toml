@@ -17,6 +17,10 @@ usbd-serial = "0.1"
 usbd-webusb = "1.0.0"
 heapless = "0.6"
 
+[dependencies.void]
+version = "1.0"
+default-features = false
+
 [dependencies.stm32f1xx-hal]
 version = "0.7"
 features = ["rt", "stm32f103", "medium", "stm32-usbd"]

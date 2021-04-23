@@ -69,20 +69,20 @@ pub fn init(peripheral: usb::Peripheral) {
 pub fn read(data: &mut [u8]) -> Result<usize, usize> {
     let mut result: usize = 0;
 
-    while result < 64{
-        if let Some(item) = INTPUT_BUFFER.dequeue() {
-            data[result] = item;
-            result += 1;
-        } else {
-            if result > 0 {
-                return Ok(result);
-            } else {
-                return Err(result);
-            }
+    while let Some(item) = INTPUT_BUFFER.dequeue() {
+        if result >= data.len() {
+            return Ok(result);
         }
+
+        data[result] = item;
+        result += 1;
     }
 
-    Err(result)
+    if result > 0 {
+        return Ok(result);
+    } else {
+        return Err(result);
+    }
 }
 
 pub fn write(data: &[u8]) -> Result<usize, ()> {
