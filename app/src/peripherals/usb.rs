@@ -107,7 +107,8 @@ fn usb_interrupt() {
         return;
     }
 
-    let mut buf = [0u8; 8];
+    let mut buf = [0u8; 64];
+
 
     match serial.read(&mut buf) {
         Ok(count) => {
