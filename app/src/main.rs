@@ -59,7 +59,6 @@ fn main() -> ! {
 
         app_usb::init(usb_peripheral);
 
-        /*
         let led_delay = app::system::delay::Delay::new();
         let mut lcd = app::drivers::lcd::Lcd::new(
             i2c, 
@@ -71,10 +70,16 @@ fn main() -> ! {
         );
 
         let _ = lcd.init();
-         */
+        let _ = lcd.reset();
+        let _ = lcd.clear();
+        let _ = lcd.write_char('A');
 
+        /*
         let mut led_delay = app::system::delay::Delay::new();
-        let mut lcd = hd44780_driver::HD44780::new_i2c(i2c, 0x27, &mut led_delay).unwrap();
+        let mut lcd = hd44780_driver::HD44780::new_i2c(
+            i2c,
+            0x27,
+            &mut led_delay).unwrap();
 
         lcd.reset(&mut led_delay);
         lcd.clear(&mut led_delay);
@@ -89,6 +94,7 @@ fn main() -> ! {
         );
 
         let _ = lcd.write_str("AAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCCCDDDDDDDDDDDDDDDDDDDD", &mut led_delay);
+         */
 
         let mut timer = app::system::timer::Timer::new();
         timer.start(1000_u32);

@@ -75,28 +75,72 @@ where
         Ok(())
     }
 
+    fn write_byte(&mut self, byte: u8) -> Result<(), ()> {
+        self.write(byte, true)?;
+
+        self.delay.delay_ms(1_u16);
+
+        Ok(())
+    }
+
+    fn command(&mut self, cmd: u8) -> Result<(), ()> {
+        self.write(cmd, false)?;
+
+        self.delay.delay_ms(1_u16);
+
+        Ok(())
+    }
+
     pub fn init(&mut self) -> Result<(), ()> {
         self.delay.delay_ms(15_u16);
 
         self.write(INITIALIZE_4BIT, false)?;
-
         self.delay.delay_ms(5u16);
 
-        self.write(0x32, false)?;
+        //self.write(0x32, false)?;
+        //self.delay.delay_ms(1u16);
 
-        self.delay.delay_ms(1u16);
+        self.command(0x32)?;
 
-        self.write(0x28, false)?;
+        //self.write(0x28, false)?;
+        //self.delay.delay_ms(1u16);
 
-        self.delay.delay_ms(1u16);
+        self.command(0x28)?;
 
-        self.write(0x0E, false)?;
+        // Clear display
+        //self.write(0x0E, false)?;
+        //self.delay.delay_ms(1u16);
 
-        self.delay.delay_ms(1u16);
+        self.command(0x0E)?;
 
-        self.write(0x01, false)?;
+        // Move the cursor to beginning of first line
+        //self.write(0x01, false)?;
+        //self.delay.delay_ms(1u16);
 
-        self.delay.delay_ms(1u16);
+        self.command(0x01)?;
+
+        //self.write(0x80, false);
+        //self.delay.delay_ms(1u16);
+
+        self.command(0x80)?;
+
+        Ok(())
+    }
+
+    pub fn clear(&mut self) -> Result<(), ()> {
+        self.command(0b0000_0001)?;
+
+        Ok(())
+    }
+
+    pub fn reset(&mut self) -> Result<(), ()> {
+        self.command(0b0000_0010)?;
+
+        Ok(())
+    }
+
+    pub fn write_char(&mut self, data: char) -> Result<(), ()> {
+        self.write_byte(data as u8)?;
 
         Ok(())
     }
