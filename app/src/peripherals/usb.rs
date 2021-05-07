@@ -21,7 +21,7 @@ static mut USB_DEVICE: Option<UsbDevice<'static, usb::UsbBusType>> = None;
 
 static INTPUT_BUFFER: Q64<u8> = Q64::new();
 
-pub struct UsbLog {}
+pub struct UsbLog;
 
 impl core::fmt::Write for UsbLog {
     fn write_str(&mut self, s: &str) -> Result<(), core::fmt::Error> {

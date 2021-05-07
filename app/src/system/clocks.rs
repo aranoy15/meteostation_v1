@@ -12,7 +12,7 @@ pub fn init(cfgr: rcc::CFGR, acr: &mut flash::ACR) -> rcc::Clocks {
     cfgr
         .use_hse(HSE_FREQ.mhz())
         .sysclk(system::config::SYSTEM_CLOCK.hz())
-        .pclk1(PCLK1_FREQ.mhz())
-        .pclk2(PCLK2_FREQ.mhz())
+        .pclk1(PCLK1_FREQ.hz())
+        .pclk2(PCLK2_FREQ.hz())
         .freeze(acr)
 }

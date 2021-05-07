@@ -16,6 +16,7 @@ usb-device = "0.2.4"
 usbd-serial = "0.1"
 usbd-webusb = "1.0.0"
 heapless = "0.6"
+hd44780-driver = "0.4"
 
 [dependencies.void]
 version = "1.0"
@@ -27,7 +28,7 @@ features = ["rt", "stm32f103", "medium", "stm32-usbd"]
 
 [profile.dev.package."*"]
 codegen-units = 1
-debug = true
+debug = false 
 opt-level = "s"
 
 [[bin]]
@@ -36,9 +37,10 @@ test = false
 bench = false
 
 [profile.dev]
+codegen-units = 1
 debug = true
+opt-level = 1
 lto = true
-opt-level = 2
 
 [profile.release]
 lto = true
