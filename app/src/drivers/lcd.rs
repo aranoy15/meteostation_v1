@@ -7,6 +7,15 @@ const BACKLIGHT: u8 = 0b0000_1000;
 const ENABLE: u8 = 0b0000_0100;
 // const READ_WRITE: u8 = 0b0000_0010; // Not used as no reading of the `HD44780` is done
 const REGISTER_SELECT: u8 = 0b0000_0001;
+const DISPLAY_CONTROL: u8 = 0b0000_1000;
+
+const ONE_LINE: u8 = 0b0000_0000;
+const TWO_LINE: u8 = 0b0000_1000;
+const FOUR_BIT_MODE: u8 = 0b0000_0000;
+const FIVE_X8_DOTS: u8 = 0b0000_0000;
+const FIVE_X10_DOTS: u8 = 0b0000_0100;
+
+const FUNCTION_SET: u8 = 0b0010_0000;
 
 const INITIALIZE_4BIT: u8 = 0x33;
 
@@ -92,37 +101,36 @@ where
     }
 
     pub fn init(&mut self) -> Result<(), ()> {
+        self.display_function = FOUR_BIT_MODE | ONE_LINE | FIVE_X8_DOTS;
+
+        if self.rows > 1 {
+            self.display_function |= TWO_LINE;
+        }
+
+        if self.char_size != 0 && self.rows == 1 {
+            self.display_function |= FIVE_X10_DOTS;
+        }
+
         self.delay.delay_ms(15_u16);
 
         self.write(INITIALIZE_4BIT, false)?;
         self.delay.delay_ms(5u16);
 
-        //self.write(0x32, false)?;
-        //self.delay.delay_ms(1u16);
-
         self.command(0x32)?;
-
-        //self.write(0x28, false)?;
-        //self.delay.delay_ms(1u16);
 
         self.command(0x28)?;
 
         // Clear display
-        //self.write(0x0E, false)?;
-        //self.delay.delay_ms(1u16);
 
         self.command(0x0E)?;
 
         // Move the cursor to beginning of first line
-        //self.write(0x01, false)?;
-        //self.delay.delay_ms(1u16);
 
         self.command(0x01)?;
 
-        //self.write(0x80, false);
-        //self.delay.delay_ms(1u16);
-
         self.command(0x80)?;
+
+        self.command(FUNCTION_SET | self.display_function)?;
 
         Ok(())
     }
@@ -135,6 +143,20 @@ where
 
     pub fn reset(&mut self) -> Result<(), ()> {
         self.command(0b0000_0010)?;
+
+        Ok(())
+    }
+
+    pub fn display(&mut self) -> Result<(), ()> {
+        self.display_control |= (1 << 2);
+        self.command(DISPLAY_CONTROL | self.display_control)?;
+
+        Ok(())
+    }
+
+    pub fn no_display(&mut self) -> Result<(), ()> {
+        self.display_control &= !(1 << 2);
+        self.command(DISPLAY_CONTROL | self.display_control)?;
 
         Ok(())
     }
