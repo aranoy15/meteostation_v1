@@ -69,35 +69,26 @@ fn main() -> ! {
             1
         );
 
-        let _ = lcd.init();
-        let _ = lcd.reset();
-        let _ = lcd.clear();
-        let _ = lcd.write_char('A');
+        lcd.init().unwrap_or_default();
+        lcd.reset().unwrap_or_default();
+        lcd.clear().unwrap_or_default();
 
-        /*
-        let mut led_delay = app::system::delay::Delay::new();
-        let mut lcd = hd44780_driver::HD44780::new_i2c(
-            i2c,
-            0x27,
-            &mut led_delay).unwrap();
+        lcd.no_backlight().unwrap_or_default();
 
-        lcd.reset(&mut led_delay);
-        lcd.clear(&mut led_delay);
+        lcd.set_cursor(0, 0).unwrap_or_default();
+        lcd.write_str("Hello, world!").unwrap_or_default();
 
-        lcd.set_display_mode(
-            hd44780_driver::DisplayMode {
-                display: hd44780_driver::Display::On,
-                cursor_visibility: hd44780_driver::Cursor::Visible,
-                cursor_blink: hd44780_driver::CursorBlink::On,
-            },
-            &mut led_delay
-        );
+        lcd.set_cursor(0, 1).unwrap_or_default();
+        lcd.write_str("Broken").unwrap_or_default();
 
-        let _ = lcd.write_str("AAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBCCCCCCCCCCCCCCCCCCCCDDDDDDDDDDDDDDDDDDDD", &mut led_delay);
-         */
+        lcd.set_cursor(0, 2).unwrap_or_default();
+        lcd.write_str("Canceling").unwrap_or_default();
+
+        lcd.set_cursor(0, 3).unwrap_or_default();
+        lcd.write_bytes(&['1' as u8, '2' as u8, '3' as u8]).unwrap_or_default();
 
         let mut timer = app::system::timer::Timer::new();
-        timer.start(1000_u32);
+        timer.start(100_u32);
 
         loop {
             match block!(timer.wait()) {
