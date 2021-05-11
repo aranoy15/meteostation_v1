@@ -6,10 +6,9 @@ use panic_halt as _;
 use app::peripherals::usb as app_usb;
 use app::system::clocks;
 use app::system::systick;
-use core::fmt::Write;
 use cortex_m_rt::entry;
 use nb::block;
-use stm32f1xx_hal::{i2c, prelude::*, stm32, timer, usb};
+use stm32f1xx_hal::{i2c, prelude::*, stm32, usb};
 
 #[entry]
 fn main() -> ! {
@@ -41,10 +40,10 @@ fn main() -> ! {
             },
             clocks,
             &mut rcc.apb1,
-            1000,
-            10,
-            1000,
-            1000,
+            100_000,
+            1,
+            100_000,
+            100_000,
         );
 
         //let mut local_delay = app::system::delay::Delay::new();
@@ -64,10 +63,11 @@ fn main() -> ! {
             i2c, 
             0x27, 
             led_delay, 
-            20, 
-            4, 
-            1
-        );
+        )
+        .columns(20)
+        .rows(4)
+        .char_size(1)
+        .build();
 
         lcd.init().unwrap_or_default();
         lcd.reset().unwrap_or_default();

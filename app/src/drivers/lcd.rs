@@ -1,13 +1,9 @@
-
-
-
-use embedded_hal::blocking::{i2c::{Read, Write, WriteRead}, delay::DelayMs};
+use embedded_hal::blocking::{i2c::{Write}, delay::DelayMs};
 
 const BACKLIGHT: u8 = 0b0000_1000;
 const NO_BACKLIGHT: u8 = 0b0000_0000;
 
 const ENABLE: u8 = 0b0000_0100;
-// const READ_WRITE: u8 = 0b0000_0010; // Not used as no reading of the `HD44780` is done
 const REGISTER_SELECT: u8 = 0b0000_0001;
 const DISPLAY_CONTROL: u8 = 0b0000_1000;
 
@@ -20,10 +16,7 @@ const FIVE_X10_DOTS: u8 = 0b0000_0100;
 const FUNCTION_SET: u8 = 0b0010_0000;
 
 const DISPLAY_ON: u8 = 0b0000_0100;
-const DISPLAY_OFF: u8 = 0b0000_0000;
-const CURSOR_ON: u8 = 0b0000_0010;
 const CURSOR_OFF: u8 = 0b0000_0000;
-const BLINK_ON: u8 = 0b0000_0001;
 const BLINK_OFF: u8 = 0b0000_0000;
 
 const ENTRY_LEFT: u8 = 0b0000_0010;
@@ -32,7 +25,8 @@ const ENTRY_MODE_SET: u8 = 0b0000_0100;
 
 const RETURN_HOME: u8 = 0b0000_0010;
 
-const SET_DDRAM_ADDR: u8 = 0b1000_0000;
+const SET_DRAM_ADDR: u8 = 0b1000_0000;
+const SET_CRAM_ADDR: u8 = 0b0100_0000;
 
 const INITIALIZE_4BIT: u8 = 0x33;
 
@@ -60,22 +54,38 @@ where
         i2c: I2cType, 
         address: u8, 
         delay: DelayType,
-        cols: u8,
-        rows: u8,
-        char_size: u8
     ) -> Self {
         Lcd {
             i2c,
             address,
             delay,
-            display_function: 0,
-            display_control: 0,
-            display_mode: 0,
-            cols,
-            rows,
-            char_size,
+            display_function: 0u8,
+            display_control: 0u8,
+            display_mode: 0u8,
+            cols: 16u8,
+            rows: 2u8,
+            char_size: 1u8,
             back_light_val: BACKLIGHT,
         }
+    }
+
+    pub fn columns(mut self, cols: u8) -> Self {
+        self.cols = cols;
+        self
+    }
+
+    pub fn rows(mut self, rows: u8) -> Self {
+        self.rows = rows;
+        self
+    }
+
+    pub fn char_size(mut self, char_size: u8) -> Self {
+        self.char_size = char_size;
+        self
+    }
+
+    pub fn build(self) -> Self {
+        self
     }
 
     fn expander_write(&mut self, nibble: u8, data: bool) {
@@ -189,14 +199,14 @@ where
     }
 
     pub fn display(&mut self) -> Result<(), ()> {
-        self.display_control |= (1 << 2);
+        self.display_control |= DISPLAY_ON;
         self.command(DISPLAY_CONTROL | self.display_control)?;
 
         Ok(())
     }
 
     pub fn no_display(&mut self) -> Result<(), ()> {
-        self.display_control &= !(1 << 2);
+        self.display_control &= !DISPLAY_ON;
         self.command(DISPLAY_CONTROL | self.display_control)?;
 
         Ok(())
@@ -213,7 +223,7 @@ where
 
         if row >= self.rows { row = self.rows - 1; }
 
-        self.command(SET_DDRAM_ADDR | (col + ROW_OFFSETS[row as usize]))?;
+        self.command(SET_DRAM_ADDR | (col + ROW_OFFSETS[row as usize]))?;
 
         Ok(())
     }
@@ -234,6 +244,17 @@ where
 
     pub fn write_str(&mut self, data: &str) -> Result<(), ()> {
         self.write_bytes(data.as_bytes())?;
+
+        Ok(())
+    }
+
+    pub fn create_char(&mut self, mut location: u8, char_map: &[u8; 8]) -> Result<(), ()> {
+        location &= 0x07_u8;
+        self.command(SET_CRAM_ADDR | (location << 3))?;
+
+        for &ch in char_map {
+            self.write_byte(ch)?;
+        }
 
         Ok(())
     }
