@@ -4,6 +4,8 @@
 use embedded_hal::blocking::{i2c::{Read, Write, WriteRead}, delay::DelayMs};
 
 const BACKLIGHT: u8 = 0b0000_1000;
+const NO_BACKLIGHT: u8 = 0b0000_0000;
+
 const ENABLE: u8 = 0b0000_0100;
 // const READ_WRITE: u8 = 0b0000_0010; // Not used as no reading of the `HD44780` is done
 const REGISTER_SELECT: u8 = 0b0000_0001;
@@ -16,6 +18,21 @@ const FIVE_X8_DOTS: u8 = 0b0000_0000;
 const FIVE_X10_DOTS: u8 = 0b0000_0100;
 
 const FUNCTION_SET: u8 = 0b0010_0000;
+
+const DISPLAY_ON: u8 = 0b0000_0100;
+const DISPLAY_OFF: u8 = 0b0000_0000;
+const CURSOR_ON: u8 = 0b0000_0010;
+const CURSOR_OFF: u8 = 0b0000_0000;
+const BLINK_ON: u8 = 0b0000_0001;
+const BLINK_OFF: u8 = 0b0000_0000;
+
+const ENTRY_LEFT: u8 = 0b0000_0010;
+const ENTRY_SHIFT_DECREMENT: u8 = 0b0000_0000;
+const ENTRY_MODE_SET: u8 = 0b0000_0100;
+
+const RETURN_HOME: u8 = 0b0000_0010;
+
+const SET_DDRAM_ADDR: u8 = 0b1000_0000;
 
 const INITIALIZE_4BIT: u8 = 0x33;
 
@@ -54,9 +71,9 @@ where
             display_function: 0,
             display_control: 0,
             display_mode: 0,
-            cols: cols,
-            rows: rows,
-            char_size: char_size,
+            cols,
+            rows,
+            char_size,
             back_light_val: BACKLIGHT,
         }
     }
@@ -132,6 +149,16 @@ where
 
         self.command(FUNCTION_SET | self.display_function)?;
 
+        self.display_control = DISPLAY_ON | CURSOR_OFF | BLINK_OFF;
+        self.display()?;
+
+        self.clear()?;
+
+        self.display_mode = ENTRY_LEFT | ENTRY_SHIFT_DECREMENT;
+        self.command(ENTRY_MODE_SET | self.display_mode)?;
+
+        self.home()?;
+
         Ok(())
     }
 
@@ -143,6 +170,20 @@ where
 
     pub fn reset(&mut self) -> Result<(), ()> {
         self.command(0b0000_0010)?;
+
+        Ok(())
+    }
+
+    pub fn backlight(&mut self) -> Result<(), ()> {
+        self.back_light_val = BACKLIGHT;
+        self.display()?;
+
+        Ok(())
+    }
+
+    pub fn no_backlight(&mut self) -> Result<(), ()> {
+        self.back_light_val = NO_BACKLIGHT;
+        self.display()?;
 
         Ok(())
     }
@@ -161,8 +202,38 @@ where
         Ok(())
     }
 
+    pub fn home(&mut self) -> Result<(), ()> {
+        self.command(RETURN_HOME)?;
+
+        Ok(())
+    }
+
+    pub fn set_cursor(&mut self, col: u8, mut row: u8) -> Result<(), ()> {
+        const ROW_OFFSETS: [u8; 4] = [0x00_u8, 0x40_u8, 0x14_u8, 0x54_u8];
+
+        if row >= self.rows { row = self.rows - 1; }
+
+        self.command(SET_DDRAM_ADDR | (col + ROW_OFFSETS[row as usize]))?;
+
+        Ok(())
+    }
+
     pub fn write_char(&mut self, data: char) -> Result<(), ()> {
         self.write_byte(data as u8)?;
+
+        Ok(())
+    }
+
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<(), ()> {
+        for &b in data {
+            self.write_byte(b)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn write_str(&mut self, data: &str) -> Result<(), ()> {
+        self.write_bytes(data.as_bytes())?;
 
         Ok(())
     }
