@@ -31,39 +31,6 @@ const SET_CRAM_ADDR: u8 = 0b0100_0000;
 const INITIALIZE_4BIT: u8 = 0x33;
 
 
-/*
-Example use
-
-        let led_delay = app::system::delay::Delay::new();
-        let mut lcd = app::drivers::lcd::Lcd::new(
-            i2c,
-            0x27,
-            led_delay,
-        )
-        .columns(20)
-        .rows(4)
-        .char_size(1)
-        .build();
-
-        lcd.init().unwrap_or_default();
-        lcd.reset().unwrap_or_default();
-        lcd.clear().unwrap_or_default();
-
-        lcd.no_backlight().unwrap_or_default();
-
-        lcd.set_cursor(0, 0).unwrap_or_default();
-        lcd.write_str("Hello, world!").unwrap_or_default();
-
-        lcd.set_cursor(0, 1).unwrap_or_default();
-        lcd.write_str("Broken").unwrap_or_default();
-
-        lcd.set_cursor(0, 2).unwrap_or_default();
-        lcd.write_str("Canceling").unwrap_or_default();
-
-        lcd.set_cursor(0, 3).unwrap_or_default();
-        lcd.write_bytes(&['1' as u8, '2' as u8, '3' as u8]).unwrap_or_default();
- */
-
 
 
 
