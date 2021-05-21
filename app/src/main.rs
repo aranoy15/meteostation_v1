@@ -3,103 +3,128 @@
 
 use panic_halt as _;
 
-use app::peripherals::usb as app_usb;
-use app::system::clocks;
-use app::system::systick;
 use cortex_m_rt::entry;
-use nb::block;
-use stm32f1xx_hal::{i2c, prelude::*, stm32, usb};
+use embedded_hal::digital::v2::OutputPin;
+use stm32f1xx_hal::usb::{Peripheral, UsbBus};
+use stm32f1xx_hal::{prelude::*, stm32};
+use usb_device::prelude::*;
+use usbd_serial::{SerialPort, USB_CLASS_CDC};
+use stm32f1xx_hal::gpio::{PushPull, Output};
+use stm32f1xx_hal::gpio::gpioc::PC13;
 
 #[entry]
 fn main() -> ! {
-    if let (Some(cp), Some(dp)) = (cortex_m::Peripherals::take(), stm32::Peripherals::take()) {
-        systick::init(cp.SYST);
+    let dp = stm32::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
 
-        let mut flash = dp.FLASH.constrain();
-        let mut rcc = dp.RCC.constrain();
-        let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
-        let cfgr = rcc.cfgr;
+    app::system::systick::init(cp.SYST);
 
-        let clocks = clocks::init(cfgr, &mut flash.acr);
+    let mut flash = dp.FLASH.constrain();
+    let mut rcc = dp.RCC.constrain();
 
-        assert!(clocks.usbclk_valid());
+    let clocks = app::system::clocks::init(rcc.cfgr, &mut flash.acr);
 
-        let gpioa = dp.GPIOA.split(&mut rcc.apb2);
-        let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
-        let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    assert!(clocks.usbclk_valid());
 
-        let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crl);
-        let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crl);
+    // Configure the on-board LED (PC13, green)
+    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
+    let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    led.set_high().unwrap(); // Turn off
 
-        let i2c = i2c::BlockingI2c::i2c1(
-            dp.I2C1,
-            (scl, sda),
-            &mut afio.mapr,
-            i2c::Mode::Standard {
-                frequency: 100_000.hz(),
-            },
-            clocks,
-            &mut rcc.apb1,
-            100_000,
-            1,
-            100_000,
-            100_000,
-        );
+    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
 
-        //let mut local_delay = app::system::delay::Delay::new();
+    let mut local_delay = app::system::delay::Delay::new();
 
-        let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    // BluePill board has a pull-up resistor on the D+ line.
+    // Pull the D+ pin down to send a RESET condition to the USB bus.
+    // This forced reset is needed only for development, without it host
+    // will not reset your device when you upload new firmware.
+    let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
+    usb_dp.set_low().unwrap();
+    local_delay.delay_ms(100_u16);
 
-        let usb_peripheral = usb::Peripheral {
-            usb: dp.USB,
-            pin_dm: gpioa.pa11,
-            pin_dp: gpioa.pa12,
-        };
+    let usb = Peripheral {
+        usb: dp.USB,
+        pin_dm: gpioa.pa11,
+        pin_dp: usb_dp.into_floating_input(&mut gpioa.crh),
+    };
+    let usb_bus = UsbBus::new(usb);
 
-        app_usb::init(usb_peripheral);
+    let mut serial = SerialPort::new(&usb_bus);
 
-        let led_delay = app::system::delay::Delay::new();
-        let mut lcd = app::drivers::lcd::Lcd::new(
-            i2c, 
-            0x27, 
-            led_delay, 
-        )
-        .columns(20)
-        .rows(4)
-        .char_size(1)
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27de))
+        .manufacturer("Fake company")
+        .product("Serial port")
+        .serial_number("TEST")
+        .device_class(USB_CLASS_CDC)
         .build();
 
-        lcd.init().unwrap_or_default();
-        lcd.reset().unwrap_or_default();
-        lcd.clear().unwrap_or_default();
+    loop {
+        check_usb_logic(&mut usb_dev, &mut serial, &mut led);
+    }
+}
 
-        lcd.no_backlight().unwrap_or_default();
+type UsbBusType = UsbBus<Peripheral>;
+type UsbDeviceType<'a> = UsbDevice<'a, UsbBusType>;
+type UsbSerialType<'a> = usbd_serial::SerialPort<'a, UsbBusType>;
+type LedType = PC13<Output<PushPull>>;
 
-        lcd.set_cursor(0, 0).unwrap_or_default();
-        lcd.write_str("Hello, world!").unwrap_or_default();
 
-        lcd.set_cursor(0, 1).unwrap_or_default();
-        lcd.write_str("Broken").unwrap_or_default();
-
-        lcd.set_cursor(0, 2).unwrap_or_default();
-        lcd.write_str("Canceling").unwrap_or_default();
-
-        lcd.set_cursor(0, 3).unwrap_or_default();
-        lcd.write_bytes(&['1' as u8, '2' as u8, '3' as u8]).unwrap_or_default();
-
-        let mut timer = app::system::timer::Timer::new();
-        timer.start(100_u32);
-
-        loop {
-            match block!(timer.wait()) {
-                Ok(()) => {
-                    led.toggle().unwrap();
-                    timer.reset();
-                }
-                Err(_) => {}
-            }
-        }
+fn check_usb_logic(usb_dev: &mut UsbDeviceType, serial: &mut UsbSerialType, led: &mut LedType) {
+    if !usb_dev.poll(&mut [serial]) {
+        return;
     }
 
-    panic!();
+    let mut buf = [0u8; 64];
+
+    const RECEIVE_STR: &str = "Receive by time ";
+
+    match serial.read(&mut buf) {
+        Ok(count) if count > 0 => {
+            led.set_low().unwrap(); // Turn on
+
+            serial.write(RECEIVE_STR.as_bytes()).unwrap();
+            while !usb_dev.poll(&mut[serial]) {}
+
+            let mut current_ticks = app::system::systick::current_tick() as u32;
+            let mut temp_number: heapless::String<heapless::consts::U64> = heapless::String::new();
+
+            if current_ticks == 0 {
+                temp_number.push('0').unwrap();
+            } else {
+                current_ticks = reverse_integer(current_ticks);
+
+                while current_ticks > 0 {
+                    let current_char: u8 = (current_ticks % 10) as u8;
+                    let temp_char: char = (current_char + 0x30_u8) as char;
+
+                    temp_number.push(temp_char).unwrap();
+
+                    current_ticks /= 10;
+                }
+            }
+
+            serial.write(temp_number.as_bytes()).unwrap();
+            while !usb_dev.poll(&mut[serial]) {}
+        }
+        _ => {}
+    }
+
+    led.set_high().unwrap(); // Turn off
 }
+
+fn reverse_integer(mut number: u32) -> u32 {
+    let mut rev = 0_u32;
+
+    while number != 0 {
+        let pop = number % 10;
+        number /= 10;
+
+        rev = rev * 10 + pop;
+    }
+
+    rev
+}
+
+
+
