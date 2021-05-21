@@ -9,7 +9,8 @@ use stm32f1xx_hal::usb::{Peripheral, UsbBus};
 use stm32f1xx_hal::{prelude::*, stm32};
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
-use stm32f1xx_hal::gpio::{PushPull, Output};
+use stm32f1xx_hal::gpio::{PushPull, Output, OpenDrain, Alternate};
+use stm32f1xx_hal::gpio::gpiob::{PB6, PB7};
 use stm32f1xx_hal::gpio::gpioc::PC13;
 
 #[entry]
@@ -21,6 +22,7 @@ fn main() -> ! {
 
     let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
+    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
     let clocks = app::system::clocks::init(rcc.cfgr, &mut flash.acr);
 
@@ -31,9 +33,42 @@ fn main() -> ! {
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
     led.set_high().unwrap(); // Turn off
 
-    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
+    //Configure i2c
+    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
+    let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crl);
+    let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crl);
 
-    let mut local_delay = app::system::delay::Delay::new();
+    let i2c = stm32f1xx_hal::i2c::BlockingI2c::i2c1(
+        dp.I2C1,
+        (scl, sda),
+        &mut afio.mapr,
+        stm32f1xx_hal::i2c::Mode::Standard {
+            frequency: 100_000.hz(),
+        },
+        clocks,
+        &mut rcc.apb1,
+        100_000,
+        1,
+        100_000,
+        100_000,
+    );
+
+    //Configure lcd
+    let mut lcd = app::drivers::lcd::Lcd::new(
+        i2c,
+        0x27,
+        app::system::delay::Delay::new()
+    );
+
+    lcd.init().unwrap();
+    lcd.clear().unwrap();
+    lcd.reset().unwrap();
+
+    lcd.write_char('A').unwrap();
+    lcd.write_char('B').unwrap();
+    lcd.write_char('C').unwrap();
+
+    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
 
     // BluePill board has a pull-up resistor on the D+ line.
     // Pull the D+ pin down to send a RESET condition to the USB bus.
@@ -41,7 +76,7 @@ fn main() -> ! {
     // will not reset your device when you upload new firmware.
     let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
     usb_dp.set_low().unwrap();
-    local_delay.delay_ms(100_u16);
+    app::system::delay::Delay::new().delay_ms(100_u16);
 
     let usb = Peripheral {
         usb: dp.USB,
@@ -60,7 +95,7 @@ fn main() -> ! {
         .build();
 
     loop {
-        check_usb_logic(&mut usb_dev, &mut serial, &mut led);
+        check_usb_logic(&mut usb_dev, &mut serial, &mut led, &mut lcd);
     }
 }
 
@@ -68,9 +103,14 @@ type UsbBusType = UsbBus<Peripheral>;
 type UsbDeviceType<'a> = UsbDevice<'a, UsbBusType>;
 type UsbSerialType<'a> = usbd_serial::SerialPort<'a, UsbBusType>;
 type LedType = PC13<Output<PushPull>>;
+type LcdType = app::drivers::lcd::Lcd<stm32f1xx_hal::i2c::BlockingI2c<stm32f1xx_hal::stm32::I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>),>, app::system::delay::Delay>;
 
 
-fn check_usb_logic(usb_dev: &mut UsbDeviceType, serial: &mut UsbSerialType, led: &mut LedType) {
+fn check_usb_logic(usb_dev: &mut UsbDeviceType,
+                   serial: &mut UsbSerialType,
+                   led: &mut LedType,
+                   lcd: &mut LcdType
+) {
     if !usb_dev.poll(&mut [serial]) {
         return;
     }
@@ -83,6 +123,10 @@ fn check_usb_logic(usb_dev: &mut UsbDeviceType, serial: &mut UsbSerialType, led:
         Ok(count) if count > 0 => {
             led.set_low().unwrap(); // Turn on
 
+            lcd.clear().unwrap();
+            lcd.set_cursor(0, 0).unwrap();
+            lcd.write_bytes(&buf[0..count]).unwrap();
+
             serial.write(RECEIVE_STR.as_bytes()).unwrap();
             while !usb_dev.poll(&mut[serial]) {}
 
@@ -94,7 +138,7 @@ fn check_usb_logic(usb_dev: &mut UsbDeviceType, serial: &mut UsbSerialType, led:
             } else {
                 current_ticks = reverse_integer(current_ticks);
 
-                while current_ticks > 0 {
+                while current_ticks != 0 {
                     let current_char: u8 = (current_ticks % 10) as u8;
                     let temp_char: char = (current_char + 0x30_u8) as char;
 
