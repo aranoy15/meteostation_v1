@@ -8,10 +8,11 @@ use embedded_hal::digital::v2::OutputPin;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus};
 use stm32f1xx_hal::{prelude::*, stm32};
 use usb_device::prelude::*;
-use usbd_serial::{SerialPort, USB_CLASS_CDC};
 use stm32f1xx_hal::gpio::{PushPull, Output, OpenDrain, Alternate};
 use stm32f1xx_hal::gpio::gpiob::{PB6, PB7};
 use stm32f1xx_hal::gpio::gpioc::PC13;
+
+use device_drivers::i2c::lcd::{Lcd, LcdTrait};
 
 #[entry]
 fn main() -> ! {
@@ -20,11 +21,9 @@ fn main() -> ! {
 
     app::system::systick::init(cp.SYST);
 
-    let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
-    let mut afio = dp.AFIO.constrain(&mut rcc.apb2);
 
-    let clocks = app::system::clocks::init(rcc.cfgr, &mut flash.acr);
+    let clocks = app::system::clocks::init();
 
     assert!(clocks.usbclk_valid());
 
@@ -34,27 +33,10 @@ fn main() -> ! {
     led.set_high().unwrap(); // Turn off
 
     //Configure i2c
-    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
-    let scl = gpiob.pb6.into_alternate_open_drain(&mut gpiob.crl);
-    let sda = gpiob.pb7.into_alternate_open_drain(&mut gpiob.crl);
-
-    let i2c = stm32f1xx_hal::i2c::BlockingI2c::i2c1(
-        dp.I2C1,
-        (scl, sda),
-        &mut afio.mapr,
-        stm32f1xx_hal::i2c::Mode::Standard {
-            frequency: 100_000.hz(),
-        },
-        clocks,
-        &mut rcc.apb1,
-        100_000,
-        1,
-        100_000,
-        100_000,
-    );
+    let i2c = app::system::i2c::i2c1(clocks.clone());
 
     //Configure lcd
-    let mut lcd = app::drivers::lcd::Lcd::new(
+    let mut lcd: Lcd<app::system::i2c::I2C1Type, app::system::delay::Delay> = Lcd::new(
         i2c,
         0x27,
         app::system::delay::Delay::new()
@@ -68,31 +50,7 @@ fn main() -> ! {
     lcd.write_char('B').unwrap();
     lcd.write_char('C').unwrap();
 
-    let mut gpioa = dp.GPIOA.split(&mut rcc.apb2);
-
-    // BluePill board has a pull-up resistor on the D+ line.
-    // Pull the D+ pin down to send a RESET condition to the USB bus.
-    // This forced reset is needed only for development, without it host
-    // will not reset your device when you upload new firmware.
-    let mut usb_dp = gpioa.pa12.into_push_pull_output(&mut gpioa.crh);
-    usb_dp.set_low().unwrap();
-    app::system::delay::Delay::new().delay_ms(100_u16);
-
-    let usb = Peripheral {
-        usb: dp.USB,
-        pin_dm: gpioa.pa11,
-        pin_dp: usb_dp.into_floating_input(&mut gpioa.crh),
-    };
-    let usb_bus = UsbBus::new(usb);
-
-    let mut serial = SerialPort::new(&usb_bus);
-
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27de))
-        .manufacturer("Fake company")
-        .product("Serial port")
-        .serial_number("TEST")
-        .device_class(USB_CLASS_CDC)
-        .build();
+    let (mut serial, mut usb_dev) = app::system::usb::usb();
 
     loop {
         check_usb_logic(&mut usb_dev, &mut serial, &mut led, &mut lcd);
@@ -103,8 +61,7 @@ type UsbBusType = UsbBus<Peripheral>;
 type UsbDeviceType<'a> = UsbDevice<'a, UsbBusType>;
 type UsbSerialType<'a> = usbd_serial::SerialPort<'a, UsbBusType>;
 type LedType = PC13<Output<PushPull>>;
-type LcdType = app::drivers::lcd::Lcd<stm32f1xx_hal::i2c::BlockingI2c<stm32f1xx_hal::stm32::I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>),>, app::system::delay::Delay>;
-
+type LcdType = Lcd<stm32f1xx_hal::i2c::BlockingI2c<stm32f1xx_hal::stm32::I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>),>, app::system::delay::Delay>;
 
 fn check_usb_logic(usb_dev: &mut UsbDeviceType,
                    serial: &mut UsbSerialType,
