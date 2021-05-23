@@ -2,6 +2,8 @@
 
 use super::systick::{current_tick, TickType};
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use cortex_m::asm;
+use crate::system::config::SYSTEM_CLOCK;
 
 #[derive(Clone, Copy)]
 pub struct Delay {
@@ -35,11 +37,8 @@ impl DelayMs<u8> for Delay {
 
 impl DelayUs<u32> for Delay {
     fn delay_us(&mut self, us: u32) {
-        if us > 1000 {
-            self.delay_ms((us / 1000) as u32);
-        } else {
-            self.delay_ms(1_u32);
-        }
+        let ticks = us * SYSTEM_CLOCK / 1_000_000;
+        asm::delay(ticks);
     }
 }
 
