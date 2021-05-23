@@ -16,7 +16,7 @@ usb-device = "0.2.4"
 usbd-serial = "0.1"
 usbd-webusb = "1.0.0"
 heapless = "0.6"
-hd44780-driver = "0.4"
+device-drivers = {git = "https://github.com/aranoy15/device-drivers.git"}
 
 [dependencies.void]
 version = "1.0"
