@@ -8,8 +8,7 @@ use embedded_hal::digital::v2::OutputPin;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus};
 use stm32f1xx_hal::{prelude::*, stm32};
 use usb_device::prelude::*;
-use stm32f1xx_hal::gpio::{PushPull, Output, OpenDrain, Alternate};
-use stm32f1xx_hal::gpio::gpiob::{PB6, PB7};
+use stm32f1xx_hal::gpio::{PushPull, Output};
 use stm32f1xx_hal::gpio::gpioc::PC13;
 
 use device_drivers::i2c::lcd::{Lcd, LcdTrait};
@@ -61,13 +60,15 @@ type UsbBusType = UsbBus<Peripheral>;
 type UsbDeviceType<'a> = UsbDevice<'a, UsbBusType>;
 type UsbSerialType<'a> = usbd_serial::SerialPort<'a, UsbBusType>;
 type LedType = PC13<Output<PushPull>>;
-type LcdType = Lcd<stm32f1xx_hal::i2c::BlockingI2c<stm32f1xx_hal::stm32::I2C1, (PB6<Alternate<OpenDrain>>, PB7<Alternate<OpenDrain>>),>, app::system::delay::Delay>;
 
-fn check_usb_logic(usb_dev: &mut UsbDeviceType,
+fn check_usb_logic<LcdType>(usb_dev: &mut UsbDeviceType,
                    serial: &mut UsbSerialType,
                    led: &mut LedType,
                    lcd: &mut LcdType
-) {
+)
+    where
+        LcdType: LcdTrait
+{
     if !usb_dev.poll(&mut [serial]) {
         return;
     }
