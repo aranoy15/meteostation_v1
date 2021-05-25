@@ -64,7 +64,7 @@ fn main() -> ! {
     _blink_timer.start(500_u32);
 
     loop {
-        check_usb_logic(&mut usb_dev, &mut serial, &mut led, &mut lcd, &mut rtc);
+        check_usb_logic(&mut usb_dev, &mut serial, &mut lcd, &mut rtc);
 
         if _blink_timer.has_wrapped() {
             led.toggle().unwrap();
@@ -76,11 +76,9 @@ fn main() -> ! {
 type UsbBusType = UsbBus<Peripheral>;
 type UsbDeviceType<'a> = UsbDevice<'a, UsbBusType>;
 type UsbSerialType<'a> = usbd_serial::SerialPort<'a, UsbBusType>;
-type LedType = PC13<Output<PushPull>>;
 
 fn check_usb_logic<LcdType, RtcType>(usb_dev: &mut UsbDeviceType,
                    serial: &mut UsbSerialType,
-                   led: &mut LedType,
                    lcd: &mut LcdType,
                    rtc: &mut RtcType
 )
