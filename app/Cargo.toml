@@ -17,6 +17,7 @@ usbd-serial = "0.1"
 usbd-webusb = "1.0.0"
 heapless = "0.6"
 device-drivers = {git = "https://github.com/aranoy15/device-drivers.git"}
+shared-bus = "0.2"
 
 [dependencies.void]
 version = "1.0"
@@ -29,7 +30,7 @@ features = ["rt", "stm32f103", "medium", "stm32-usbd"]
 [profile.dev.package."*"]
 codegen-units = 1
 debug = true
-opt-level = 3
+opt-level = 's'
 
 [[bin]]
 name = "app"
@@ -39,8 +40,8 @@ bench = false
 [profile.dev]
 codegen-units = 1
 debug = true
-opt-level = 3
-lto = false
+opt-level = 1
+#lto = false
 
 [profile.release]
 lto = true
