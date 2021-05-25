@@ -8,11 +8,11 @@ use embedded_hal::digital::v2::OutputPin;
 use stm32f1xx_hal::usb::{Peripheral, UsbBus};
 use stm32f1xx_hal::{prelude::*, stm32};
 use usb_device::prelude::*;
-use stm32f1xx_hal::gpio::{PushPull, Output};
-use stm32f1xx_hal::gpio::gpioc::PC13;
+
+
 
 use device_drivers::i2c::lcd::{Lcd, LcdTrait};
-use device_drivers::i2c::rtc::traits::{RtcTrait, DateTimeTrait};
+use device_drivers::i2c::rtc::traits::{DateTimeTrait};
 use device_drivers::i2c::rtc::datetime::DateTime;
 
 #[entry]
